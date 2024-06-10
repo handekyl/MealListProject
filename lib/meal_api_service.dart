@@ -1,66 +1,71 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'dart:convert'; // JSON verilerini çözümlemek için kullanılan kütüphane
+import 'package:http/http.dart'
+    as http; // HTTP isteklerini yapmak için kullanılan kütüphane
 
-class MealApiService with ChangeNotifier {
-  final String _categoriesUrl =
-      'https://www.themealdb.com/api/json/v1/1/list.php?c=list';
-  final String _areasUrl =
-      'https://www.themealdb.com/api/json/v1/1/list.php?a=list';
+// TheMealDB API ile etkileşim için servis sınıfı
+class MealApiService {
+  // API'nin temel URL'si
+  static const _baseUrl = 'https://www.themealdb.com/api/json/v1/1';
 
-  List<String> _categories = [];
-  List<String> _areas = [];
-  bool _isLoading = false;
-  String? _errorMessage;
+  // Yemek kategorilerini alma fonksiyonu
+  Future<List<String>> fetchMealCategories() async {
+    // Belirtilen URL'ye GET isteği gönderme
+    final response = await http.get(Uri.parse('$_baseUrl/categories.php'));
 
-  List<String> get categories => _categories;
-  List<String> get areas => _areas;
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-
-  Future<void> fetchMealCategories() async {
-    _setLoading(true);
-    try {
-      final response = await http.get(Uri.parse(_categoriesUrl));
-      if (response.statusCode == 200) {
-        Map<String, dynamic> data = json.decode(response.body);
-        List<dynamic> categories = data['meals'];
-        _categories = categories
-            .map((category) => category['strCategory'] as String)
-            .toList();
-      } else {
-        _errorMessage =
-            'Failed to load meal categories: ${response.reasonPhrase}';
-      }
-    } catch (e) {
-      _errorMessage = 'An error occurred: $e';
-    } finally {
-      _setLoading(false);
+    // İstek başarılı ise
+    if (response.statusCode == 200) {
+      // JSON yanıtını çözümleme
+      final data = json.decode(response.body);
+      // Kategorileri içeren bir liste döndürme
+      return (data['categories'] as List)
+          .map((category) => category['strCategory'] as String)
+          .toList();
+    } else {
+      // İstek başarısız ise hata fırlatma
+      throw Exception('Kategoriler yüklenemedi');
     }
-    notifyListeners();
   }
 
-  Future<void> fetchMealAreas() async {
-    _setLoading(true);
-    try {
-      final response = await http.get(Uri.parse(_areasUrl));
-      if (response.statusCode == 200) {
-        Map<String, dynamic> data = json.decode(response.body);
-        List<dynamic> areas = data['meals'];
-        _areas = areas.map((area) => area['strArea'] as String).toList();
-      } else {
-        _errorMessage = 'Failed to load meal areas: ${response.reasonPhrase}';
-      }
-    } catch (e) {
-      _errorMessage = 'An error occurred: $e';
-    } finally {
-      _setLoading(false);
+  // Belirli bir kategoriye ait yemekleri alma fonksiyonu
+  Future<List<Map<String, String>>> fetchMealsByCategory(
+      String category) async {
+    // Belirtilen kategoriye ait yemekleri almak için GET isteği gönderme
+    final response =
+        await http.get(Uri.parse('$_baseUrl/filter.php?c=$category'));
+
+    // İstek başarılı ise
+    if (response.statusCode == 200) {
+      // JSON yanıtını çözümleme
+      final data = json.decode(response.body);
+      // Yemekleri içeren bir liste döndürme
+      return (data['meals'] as List)
+          .map((meal) => {
+                'id': meal['idMeal'] as String, // Yemeğin ID'si
+                'name': meal['strMeal'] as String, // Yemeğin adı
+                'thumbnail':
+                    meal['strMealThumb'] as String, // Yemeğin küçük resmi
+              })
+          .toList();
+    } else {
+      // İstek başarısız ise hata fırlatma
+      throw Exception('Yemekler yüklenemedi');
     }
-    notifyListeners();
   }
 
-  void _setLoading(bool isLoading) {
-    _isLoading = isLoading;
-    notifyListeners();
+  // Belirli bir yemeğin detaylarını alma fonksiyonu
+  Future<Map<String, dynamic>> fetchMealDetails(String id) async {
+    // Belirtilen yemeğin detaylarını almak için GET isteği gönderme
+    final response = await http.get(Uri.parse('$_baseUrl/lookup.php?i=$id'));
+
+    // İstek başarılı ise
+    if (response.statusCode == 200) {
+      // JSON yanıtını çözümleme
+      final data = json.decode(response.body);
+      // Yemeğin detaylarını döndürme
+      return data['meals'][0];
+    } else {
+      // İstek başarısız ise hata fırlatma
+      throw Exception('Yemek detayları yüklenemedi');
+    }
   }
 }
