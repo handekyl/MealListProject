@@ -1,77 +1,178 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'meal_api_service.dart'; // Meal API servisini içe aktarma
 
 void main() {
-  runApp(const MyApp());
+  runApp(const MealApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+// Uygulamanın ana widget'ı
+class MealApp extends StatelessWidget {
+  const MealApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'X Restaurant',
+      title: 'Meal App', // Uygulama başlığı
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        textTheme: GoogleFonts.lobsterTextTheme(
-          Theme.of(context).textTheme,
-        ),
+        primarySwatch: Colors.blue, // Tema rengi
       ),
-      home: const HomePage(),
+      home: MealCategoriesScreen(), // Ana ekran
     );
   }
 }
 
-class GoogleFonts {
-  static lobsterTextTheme(TextTheme textTheme) {}
+// Yemek kategorilerini görüntüleyen ekran
+class MealCategoriesScreen extends StatelessWidget {
+  final MealApiService apiService = MealApiService(); // API servisi örneği
 
-  static pacifico({required TextStyle textStyle}) {}
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
-
-  get assets => null;
+  MealCategoriesScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    var mainpage;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('X Restaurant'),
+        title: const Text('Meal Categories'), // Uygulama çubuğu başlığı
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.blueAccent, width: 4),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              padding: const EdgeInsets.all(10),
-              child: Image.asset(assets / mainpage.jpg),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.blueAccent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-              child: Text(
-                'Welcome to X Restaurant',
-                style: GoogleFonts.pacifico(
-                  textStyle: const TextStyle(
-                    fontSize: 30,
-                    color: Colors.white,
+      body: FutureBuilder<List<String>>(
+        future: apiService.fetchMealCategories(), // Yemek kategorilerini al
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+                child: CircularProgressIndicator()); // Yükleniyor göstergesi
+          } else if (snapshot.hasError) {
+            return Center(
+                child: Text('Error: ${snapshot.error}')); // Hata mesajı
+          } else {
+            final categories = snapshot.data!; // Kategorileri al
+            return ListView.builder(
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                final category = categories[index];
+                return ListTile(
+                  title: Text(category), // Kategori adı
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MealListScreen(
+                            category:
+                                category), // Kategoriye göre yemek listesi ekranı
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+// Belirli bir kategoriye ait yemekleri görüntüleyen ekran
+class MealListScreen extends StatelessWidget {
+  final String category;
+  final MealApiService apiService = MealApiService(); // API servisi örneği
+
+  MealListScreen({Key? key, required this.category}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('$category Meals'), // Uygulama çubuğu başlığı
+      ),
+      body: FutureBuilder<List<Map<String, String>>>(
+        future: apiService
+            .fetchMealsByCategory(category), // Kategoriye göre yemekleri al
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+                child: CircularProgressIndicator()); // Yükleniyor göstergesi
+          } else if (snapshot.hasError) {
+            return Center(
+                child: Text('Error: ${snapshot.error}')); // Hata mesajı
+          } else {
+            final meals = snapshot.data!; // Yemekleri al
+            return ListView.builder(
+              itemCount: meals.length,
+              itemBuilder: (context, index) {
+                final meal = meals[index];
+                return ListTile(
+                  leading: Hero(
+                    tag: meal['id']!,
+                    child: Image.network(meal['thumbnail']!), // Yemek resmi
                   ),
-                ),
+                  title: Text(meal['name']!), // Yemek adı
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MealDetailsScreen(
+                            mealId: meal['id']!), // Yemek detay ekranı
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+// Belirli bir yemeğin detaylarını görüntüleyen ekran
+class MealDetailsScreen extends StatelessWidget {
+  final String mealId;
+  final MealApiService apiService = MealApiService(); // API servisi örneği
+
+  MealDetailsScreen({Key? key, required this.mealId}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Meal Details'), // Uygulama çubuğu başlığı
+      ),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: apiService.fetchMealDetails(mealId), // Yemek detaylarını al
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+                child: CircularProgressIndicator()); // Yükleniyor göstergesi
+          } else if (snapshot.hasError) {
+            return Center(
+                child: Text('Error: ${snapshot.error}')); // Hata mesajı
+          } else {
+            final meal = snapshot.data!; // Yemek detaylarını al
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  Hero(
+                    tag: mealId,
+                    child: Image.network(meal['strMealThumb']), // Yemek resmi
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      meal['strMeal'],
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold), // Yemek adı
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(meal['strInstructions']), // Yemek tarifi
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
+            );
+          }
+        },
       ),
     );
   }
